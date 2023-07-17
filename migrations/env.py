@@ -10,7 +10,6 @@ from main import metadata
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-
 DB_URL = config_decouple("DB_URL_TEST")
 config.set_main_option("sqlalchemy.url", DB_URL)
 
