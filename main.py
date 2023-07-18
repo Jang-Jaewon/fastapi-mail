@@ -7,7 +7,7 @@ import jwt
 import sqlalchemy
 from decouple import config
 from email_validator import EmailNotValidError, validate_email
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, dependencies
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, field_validator
@@ -19,6 +19,13 @@ algorithm = config("ALGORITHM")
 
 database = databases.Database(DB_URL)
 metadata = sqlalchemy.MetaData()
+
+
+class UserRole(enum.Enum):
+    super_admin = "super admin"
+    admin = "admin"
+    user = "user"
+
 
 users = sqlalchemy.Table(
     "users",
@@ -40,6 +47,12 @@ users = sqlalchemy.Table(
         nullable=False,
         server_default=sqlalchemy.func.now(),
         onupdate=sqlalchemy.func.now(),
+    ),
+    sqlalchemy.Column(
+        "role",
+        sqlalchemy.Enum(UserRole),
+        nullable=False,
+        server_default=UserRole.user.name,
     ),
 )
 
@@ -173,3 +186,9 @@ async def create_user(user: UserSignIn):
     created_user = await database.fetch_one(users.select().where(users.c.id == id_))
     token = create_access_token(created_user)
     return {"token": token}
+
+
+@app.get("/clothes", dependencies=[Depends(oauth2_scheme)])
+async def get_all_clothes(request: Request):
+    user = request.state.user
+    return await database.fetch_all(clothes.select())
