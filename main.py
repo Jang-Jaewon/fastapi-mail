@@ -7,6 +7,7 @@ from pydantic import BaseModel, field_validator, EmailStr
 from fastapi import FastAPI
 from decouple import config
 from email_validator import validate_email, EmailNotValidError
+from passlib.context import CryptContext
 
 
 DB_URL = config("DB_URL_TEST")
@@ -116,6 +117,7 @@ class UserSignOut(BaseUser):
 
 
 app = FastAPI()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 @app.on_event("startup")
@@ -130,6 +132,7 @@ async def shutdown():
 
 @app.post("/register/", response_model=UserSignOut)
 async def create_user(user: UserSignIn):
+    user.password = pwd_context.hash(user.password)
     q = users.insert().values(**user.model_dump())
     id_ = await database.execute(q)
     created_user = await database.fetch_one(users.select().where(users.c.id == id_))
