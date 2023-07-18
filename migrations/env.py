@@ -1,10 +1,9 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
 from alembic import context
 from decouple import config as config_decouple
+from sqlalchemy import engine_from_config, pool
+
 from main import metadata
 
 # this is the Alembic Config object, which provides

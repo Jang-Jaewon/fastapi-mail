@@ -1,16 +1,21 @@
-from datetime import datetime
-from typing import Optional
-import databases
 import enum
-import sqlalchemy
-from pydantic import BaseModel, field_validator, EmailStr
-from fastapi import FastAPI
-from decouple import config
-from email_validator import validate_email, EmailNotValidError
-from passlib.context import CryptContext
+from datetime import datetime, timedelta
+from typing import Optional
 
+import databases
+import jwt
+import sqlalchemy
+from decouple import config
+from email_validator import EmailNotValidError, validate_email
+from fastapi import FastAPI, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from passlib.context import CryptContext
+from pydantic import BaseModel, EmailStr, field_validator
+from starlette.requests import Request
 
 DB_URL = config("DB_URL_TEST")
+jwt_secret = config("JWT_SECRET")
+algorithm = config("ALGORITHM")
 
 database = databases.Database(DB_URL)
 metadata = sqlalchemy.MetaData()
@@ -120,6 +125,36 @@ app = FastAPI()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+class CustomHTTPBearer(HTTPBearer):
+    async def __call__(
+        self, request: Request
+    ) -> Optional[HTTPAuthorizationCredentials]:
+        res = await super().__call__(request)
+
+        try:
+            payload = jwt.decode(res.credentials, jwt_secret, algorithms=[algorithm])
+            user = await database.fetch_one(
+                users.select().where(users.c.id == payload["sub"])
+            )
+            request.state.user = user
+            return payload
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(401, "Token is expired")
+        except jwt.InvalidTokenError:
+            raise HTTPException(401, "Invalid token")
+
+
+oauth2_scheme = CustomHTTPBearer()
+
+
+def create_access_token(user):
+    try:
+        payload = {"sub": user["id"], "exp": datetime.utcnow() + timedelta(minutes=120)}
+        return jwt.encode(payload, config("JWT_SECRET"), algorithm="HS256")
+    except Exception as ex:
+        raise ex
+
+
 @app.on_event("startup")
 async def startup():
     await database.connect()
@@ -130,10 +165,11 @@ async def shutdown():
     await database.disconnect()
 
 
-@app.post("/register/", response_model=UserSignOut)
+@app.post("/register/")
 async def create_user(user: UserSignIn):
     user.password = pwd_context.hash(user.password)
     q = users.insert().values(**user.model_dump())
     id_ = await database.execute(q)
     created_user = await database.fetch_one(users.select().where(users.c.id == id_))
-    return created_user
+    token = create_access_token(created_user)
+    return {"token": token}
