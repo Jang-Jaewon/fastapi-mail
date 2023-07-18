@@ -1,10 +1,10 @@
 import databases
 import enum
 import sqlalchemy
-
+from pydantic import BaseModel, field_validator
 from fastapi import FastAPI
 from decouple import config
-
+from email_validator import validate_email as validate_e, EmailNotValidError
 
 DB_URL = config("DB_URL_TEST")
 
@@ -75,6 +75,31 @@ clothes = sqlalchemy.Table(
 )
 
 
+class BaseUser(BaseModel):
+    email: str
+    full_name: str
+
+    @field_validator("email")
+    def validate_email(cls, value):
+        try:
+            validate_e(value)
+            return value
+        except EmailNotValidError:
+            raise ValueError("Email is not valid")
+
+    @field_validator("full_name")
+    def validate_full_name(cls, value):
+        try:
+            first_name, last_name = value.splie()
+            return value
+        except Exception:
+            raise ValueError("You should provide at least 2 names")
+
+
+class UserSignIn(BaseUser):
+    password: str
+
+
 app = FastAPI()
 
 
@@ -86,3 +111,10 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
+
+
+@app.post("/register/")
+async def create_user(user: UserSignIn):
+    q = users.insert().values(**user.model_dump())
+    id_ = await database.execute(q)
+    return
