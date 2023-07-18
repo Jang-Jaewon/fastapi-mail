@@ -1,10 +1,13 @@
+from datetime import datetime
+from typing import Optional
 import databases
 import enum
 import sqlalchemy
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, EmailStr
 from fastapi import FastAPI
 from decouple import config
-from email_validator import validate_email as validate_e, EmailNotValidError
+from email_validator import validate_email, EmailNotValidError
+
 
 DB_URL = config("DB_URL_TEST")
 
@@ -75,29 +78,41 @@ clothes = sqlalchemy.Table(
 )
 
 
-class BaseUser(BaseModel):
-    email: str
-    full_name: str
+class EmailField(EmailStr):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
 
-    @field_validator("email")
-    def validate_email(cls, value):
+    @classmethod
+    def validate(cls, value: str) -> str:
         try:
-            validate_e(value)
-            return value
+            v = validate_email(value)
+            return v["email"]
         except EmailNotValidError:
             raise ValueError("Email is not valid")
+
+
+class BaseUser(BaseModel):
+    email: EmailField
+    full_name: str
 
     @field_validator("full_name")
     def validate_full_name(cls, value):
         try:
-            first_name, last_name = value.splie()
+            first_name, last_name = value.split()
             return value
-        except Exception:
+        except ValueError:
             raise ValueError("You should provide at least 2 names")
 
 
 class UserSignIn(BaseUser):
     password: str
+
+
+class UserSignOut(BaseUser):
+    phone: Optional[str]
+    created_at: datetime
+    last_modified_at: datetime
 
 
 app = FastAPI()
@@ -113,8 +128,9 @@ async def shutdown():
     await database.disconnect()
 
 
-@app.post("/register/")
+@app.post("/register/", response_model=UserSignOut)
 async def create_user(user: UserSignIn):
     q = users.insert().values(**user.model_dump())
     id_ = await database.execute(q)
-    return
+    created_user = await database.fetch_one(users.select().where(users.c.id == id_))
+    return created_user
