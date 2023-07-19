@@ -19,3 +19,4 @@ class UserManager:
             raise HTTPException(400, "User with this email already exists")
         user_obj = await database.fetch_one(user.select().where(user.c.id == id_))
         return AuthManager.encode_token(user_obj)
+
