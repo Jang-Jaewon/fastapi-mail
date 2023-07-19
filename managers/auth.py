@@ -8,7 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.requests import Request
 
 from db import database
-from models import RoleType, user
+from models import user
 
 jwt_secret = config("JWT_SECRET")
 algorithm = config("ALGORITHM")
@@ -16,10 +16,10 @@ algorithm = config("ALGORITHM")
 
 class AuthManager:
     @staticmethod
-    def encode_token(user):
+    def encode_token(user_obj):
         try:
             payload = {
-                "sub": user["id"],
+                "sub": user_obj["id"],
                 "exp": datetime.utcnow() + timedelta(minutes=120),
             }
             return jwt.encode(payload, jwt_secret, algorithm=algorithm)
@@ -48,4 +48,3 @@ class CustomHHTPBearer(HTTPBearer):
 
 
 oauth2_scheme = CustomHHTPBearer()
-
