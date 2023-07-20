@@ -8,7 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.requests import Request
 
 from db import database
-from models import user
+from models import RoleType, user
 
 jwt_secret = config("JWT_SECRET")
 algorithm = config("ALGORITHM")
@@ -48,3 +48,18 @@ class CustomHHTPBearer(HTTPBearer):
 
 
 oauth2_scheme = CustomHHTPBearer()
+
+
+def is_complainer(request: Request):
+    if not request.state.user["role"] == RoleType.complainer:
+        raise HTTPException(403, "Forbidden")
+
+
+def is_approver(request: Request):
+    if not request.state.user["role"] == RoleType.approver:
+        raise HTTPException(403, "Forbidden")
+
+
+def is_admin(request: Request):
+    if not request.state.user["role"] == RoleType.admin:
+        raise HTTPException(403, "Forbidden")
