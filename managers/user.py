@@ -4,7 +4,7 @@ from passlib.context import CryptContext
 
 from db import database
 from managers.auth import AuthManager
-from models import user
+from models import RoleType, user
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -38,3 +38,9 @@ class UserManager:
     @staticmethod
     async def get_user_by_email(email):
         return await database.fetch_all(user.select().where(user.c.email == email))
+
+    @staticmethod
+    async def change_role(role: RoleType, user_id):
+        await database.execute(
+            user.update().where(user.c.id == user_id).values(role=role)
+        )
