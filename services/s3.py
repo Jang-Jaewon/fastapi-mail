@@ -23,4 +23,5 @@ class S3Service:
             )
             return f"https://{self.bucket}.s3.{self.region}.amazonaws.com/{key}"
         except Exception as ex:
+            print(f"S3 upload failed: {ex}")
             raise HTTPException(500, "S3 is not available")
