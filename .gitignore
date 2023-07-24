@@ -179,3 +179,4 @@ pyrightconfig.json
 .DS_Store
 staticfiles
 .envs/*
+temp_files/*
