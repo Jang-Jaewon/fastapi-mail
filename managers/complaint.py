@@ -1,13 +1,17 @@
 import os
 import uuid
 
+from decouple import config
+
 from constants import TEMP_FILE_FOLDER
 from db import database
 from models import RoleType, State, complaint
 from services.s3 import S3Service
+from services.ses import SESService
 from utils.helpers import decode_photo
 
 s3 = S3Service()
+ses = SESService()
 
 
 class ComplaintManager:
@@ -43,6 +47,11 @@ class ComplaintManager:
             complaint.update()
             .where(complaint.c.id == id_)
             .values(status=State.approved)
+        )
+        ses.send_mail(
+            "Complaint approved!",
+            [config("EMAIL_ADDRESS")],
+            "Congrats! Your claim is approved, check your bank account in 2 days for your refund",
         )
 
     @staticmethod
